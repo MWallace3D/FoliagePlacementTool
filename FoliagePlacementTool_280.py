@@ -76,7 +76,6 @@ def SpawnFoliageCopies(foliageObjects, foliageEmpties, foliageNameSuffix):
 
         for o in range(len(foliageObjects)): 
             currentObj = foliageObjects[o]
-            objectCopy = currentObj.copy()
             objectData = currentObj.data.copy()
             objectName = currentObj.name + foliageNameSuffix
             newObject = bpy.data.objects.new(objectName, objectData)
@@ -110,7 +109,7 @@ def SpawnPlaceholdersToObjects(foliageObjects, foliageEmptyColl) :
     RotateXMatrix = Euler((0, math.radians(90), 0), 'XYZ').to_matrix()
     
     for o in foliageObjects :
-    	objectPosition = o.location
+        objectPosition = o.location
         objectScale = o.scale[0]
         objectRotMatrix = o.rotation_euler.to_matrix()
         rotationMatrix = objectRotMatrix @ RotateXMatrix
@@ -139,7 +138,7 @@ def RespawnSelectedPlaceholders(foliageEmpties, maxRot, maxDistance, maxScaleOff
 def GetFoliageCopyReference(foliageCopyName, foliageNameSuffix) :
     namesplit = foliageCopyName.split(foliageNameSuffix)
     objectName = namesplit[0]
-    objectRef = bpy.context.scene.objects[objectName]
+    objectRef = bpy.context.scene.objects.get(objectName)
 
     return objectRef
 
@@ -165,6 +164,7 @@ def main(context, toolFunction):
     foliageNameSuffix = "_FPTool"
     activeObjectName = context.active_object.name
     # separate selected objects into placeholders, foliage copies, and foliage mesh objects
+    referenceMissing = False
     selectedCopyNames = []
     foliageCopyRefs = []
     foliageMeshObjects = []
@@ -174,76 +174,81 @@ def main(context, toolFunction):
             selectedPlaceholders.append(o)
         elif foliageNameSuffix in o.name :
             foliageObject = GetFoliageCopyReference(o.name, foliageNameSuffix)
+            if not foliageObject :
+                referenceMissing = True
             selectedCopyNames.append(o.name)
             if not (foliageObject in foliageCopyRefs) :
                 foliageCopyRefs.append(foliageObject)
         elif o.type == "MESH" :
             foliageMeshObjects.append(o)
 
-    if toolFunction == 1 :
-        if (len(selectedPlaceholders) > 0) or (len(foliageCopyRefs) > 0) :
-            # get placeholders for selected copies
-            if (len(foliageCopyRefs) > 0) :
-                selectedPlaceholders = []
-                for i in range(len(selectedCopyNames)) :
-                    foliageObject = GetFoliageCopyReference(selectedCopyNames[i], foliageNameSuffix)
-                    foliageColl = data.collections.get(foliageObject.name)
-                    if len(placeholderObjects) != len(foliageColl.objects) or placeholderObjects[0].location != foliageColl.objects[0].location :
-                    	for oldCopy in (placeholderObjects) :
-                    		bpy.data.objects.remove(oldCopy, do_unlink=True)
-                    	placeholderObjects = SpawnPlaceholdersToObjects(foliageColl.objects, placeholderColl)
-                    for j in range(len(foliageColl.objects)) :
-                        if selectedCopyNames[i] == foliageColl.objects[j].name :
-                            selectedPlaceholders.append(placeholderObjects[j])
-            # respawn placeholder objects
-            RespawnSelectedPlaceholders(selectedPlaceholders, maxRotation, maxDistance, maxScaleOffset, placeholderColl)
-        else :
-            # clear current foliage placeholder collection, or create a new one
-            if "FoliagePlaceholders" in data.collections :
-                for oldCopy in (placeholderObjects) :
-                    bpy.data.objects.remove(oldCopy, do_unlink=True)
-            else:
-                placeholderColl = data.collections.new("FoliagePlaceholders")
-                scene.collection.children.link(placeholderColl)
-            
-            placeholderObjects = SpawnFoliagePlaceholders(foliageCount, maxRotation, maxDistance, maxScaleOffset, placeholderColl)
-
-    # pick selected mesh objects if there are no foliage copy references
-    if (len(foliageCopyRefs) == 0 and len(foliageMeshObjects) > 0) :        
-        foliageCopyRefs = foliageMeshObjects
-
-    # spawn foliage mesh copies
-    if (len(foliageCopyRefs) > 0) :
-        # clear current foliage copy collections or create new ones
-        for i in range(len(foliageCopyRefs)):
-            foliageRef = foliageCopyRefs[i]
-            foliageColl = data.collections.get(foliageRef.name)
-            if foliageColl : #and len(foliageColl.objects) > 0 :
-                if toolFunction == 2 and len(foliageColl.objects) > 0 and (len(placeholderObjects) != len(foliageColl.objects) or placeholderObjects[0].location != foliageColl.objects[0].location) :
-                	for oldCopy in (placeholderObjects) :
-                    	bpy.data.objects.remove(oldCopy, do_unlink=True)
-                    placeholderObjects = SpawnPlaceholdersToObjects(foliageColl.objects, placeholderColl)
-                for oldCopy in foliageColl.objects :
-                    bpy.data.objects.remove(oldCopy, do_unlink=True)
+    if not referenceMissing :
+        if toolFunction == 1 :
+            if (len(selectedPlaceholders) > 0) or (len(foliageCopyRefs) > 0) :
+                # get placeholders for selected copies
+                if (len(foliageCopyRefs) > 0) :
+                    selectedPlaceholders = []
+                    for i in range(len(selectedCopyNames)) :
+                        foliageObject = GetFoliageCopyReference(selectedCopyNames[i], foliageNameSuffix)
+                        foliageColl = data.collections.get(foliageObject.name)
+                        if len(placeholderObjects) != len(foliageColl.objects) or placeholderObjects[0].location != foliageColl.objects[0].location :
+                            for oldCopy in (placeholderObjects) :
+                                bpy.data.objects.remove(oldCopy, do_unlink=True)
+                            placeholderObjects = SpawnPlaceholdersToObjects(foliageColl.objects, placeholderColl)
+                        for j in range(len(foliageColl.objects)) :
+                            if selectedCopyNames[i] == foliageColl.objects[j].name :
+                                selectedPlaceholders.append(placeholderObjects[j])
+                # respawn placeholder objects
+                RespawnSelectedPlaceholders(selectedPlaceholders, maxRotation, maxDistance, maxScaleOffset, placeholderColl)
             else :
-                foliageColl = data.collections.new(foliageRef.name)
-                scene.collection.children.link(foliageColl)
+                # clear current foliage placeholder collection, or create a new one
+                if "FoliagePlaceholders" in data.collections :
+                    for oldCopy in (placeholderObjects) :
+                        bpy.data.objects.remove(oldCopy, do_unlink=True)
+                else:
+                    placeholderColl = data.collections.new("FoliagePlaceholders")
+                    scene.collection.children.link(placeholderColl)
+                
+                placeholderObjects = SpawnFoliagePlaceholders(foliageCount, maxRotation, maxDistance, maxScaleOffset, placeholderColl)
 
-        SpawnFoliageCopies(foliageCopyRefs, placeholderObjects, foliageNameSuffix)
+        # pick selected mesh objects if there are no foliage copy references
+        if (len(foliageCopyRefs) == 0 and len(foliageMeshObjects) > 0) :        
+            foliageCopyRefs = foliageMeshObjects
 
-        # reselect foliage copies that were previously cleared
-        for n in selectedCopyNames :
-            foliageObject = scene.objects.get(n)
-            if foliageObject :
-                foliageObject.select_set(True)
-                if foliageObject.name == activeObjectName :
-                	layer.objects.active = foliageObject
-    # remove garbage
-    for block in bpy.data.meshes:
-	    if block.users == 0:
-	        bpy.data.meshes.remove(block)
+        # spawn foliage mesh copies
+        if (len(foliageCopyRefs) > 0) :
+            # clear current foliage copy collections or create new ones
+            for i in range(len(foliageCopyRefs)):
+                foliageRef = foliageCopyRefs[i]
+                foliageColl = data.collections.get(foliageRef.name)
+                if foliageColl : #and len(foliageColl.objects) > 0 :
+                    if toolFunction == 2 and len(foliageColl.objects) > 0 and (len(placeholderObjects) != len(foliageColl.objects) or placeholderObjects[0].location != foliageColl.objects[0].location) :
+                        for oldCopy in (placeholderObjects) :
+                            bpy.data.objects.remove(oldCopy, do_unlink=True)
+                        placeholderObjects = SpawnPlaceholdersToObjects(foliageColl.objects, placeholderColl)
+                    for oldCopy in foliageColl.objects :
+                        bpy.data.objects.remove(oldCopy, do_unlink=True)
+                else :
+                    foliageColl = data.collections.new(foliageRef.name)
+                    scene.collection.children.link(foliageColl)
 
-    layer.update()
+            SpawnFoliageCopies(foliageCopyRefs, placeholderObjects, foliageNameSuffix)
+
+            # reselect foliage copies that were previously cleared
+            for n in selectedCopyNames :
+                foliageObject = scene.objects.get(n)
+                if foliageObject :
+                    foliageObject.select_set(True)
+                    if foliageObject.name == activeObjectName :
+                        layer.objects.active = foliageObject
+        # remove garbage
+        for block in bpy.data.meshes:
+            if block.users == 0:
+                bpy.data.meshes.remove(block)
+
+        layer.update()
+
+    return not referenceMissing
 
 # create operator class for unit scale button
 class FP_OT_ApplyUnrealUnitsOperator(Operator):
@@ -315,9 +320,25 @@ class FP_OT_SpawnFoliageOperator(Operator):
             return {'CANCELLED'}
                         
         else:
-            main(context, 1)
-            
-            return {'FINISHED'}
+
+            spawnSuccessful = main(context, 1)
+
+            if spawnSuccessful :
+
+                return {'FINISHED'}
+
+            else :
+                foliageNameSuffix = "_FPTool"
+                for c in context.selected_objects :
+                    foliageObjectName = c.name
+                    if foliageNameSuffix in c.name :
+                        foliageObject = GetFoliageCopyReference(c.name, foliageNameSuffix)
+                        if not foliageObject :
+                            namesplit = c.name.split(foliageNameSuffix)
+                            referenceName = namesplit[0]
+                            self.report({'ERROR'}, "Can't find original foliage object! Remove collection, or use another object named '" + referenceName + "'.")
+
+                return {'CANCELLED'}
 
 # create operator class for foliage placement button
 class FP_OT_ReplaceFoliageOperator(Operator):
@@ -338,9 +359,25 @@ class FP_OT_ReplaceFoliageOperator(Operator):
             return {'CANCELLED'}
                         
         else:
-            main(context, 2)
-            
-            return {'FINISHED'}
+
+            spawnSuccessful = main(context, 2)
+
+            if spawnSuccessful :
+
+                return {'FINISHED'}
+
+            else :
+                foliageNameSuffix = "_FPTool"
+                for c in context.selected_objects :
+                    foliageObjectName = c.name
+                    if foliageNameSuffix in c.name :
+                        foliageObject = GetFoliageCopyReference(c.name, foliageNameSuffix)
+                        if not foliageObject :
+                            namesplit = c.name.split(foliageNameSuffix)
+                            referenceName = namesplit[0]
+                            self.report({'ERROR'}, "Can't find original foliage object! Remove collection, or use another object named '" + referenceName + "'.")
+
+                return {'CANCELLED'}
 
 # create operator class for placeholder select button
 class FP_OT_TogglePlaceholdersOperator(Operator):
@@ -396,8 +433,16 @@ class FP_OT_SelectFoliageCopiesOperator(Operator):
                 foliageObjectName = c.name
                 foliageColl = bpy.data.collections.get(c.name)
                 if foliageNameSuffix in c.name :
-                    foliageObjectName = GetFoliageCopyReference(c.name, foliageNameSuffix).name
-                    foliageColl = bpy.data.collections.get(foliageObjectName)
+                    foliageObject = GetFoliageCopyReference(c.name, foliageNameSuffix)
+
+                    if not foliageObject :
+                        namesplit = c.name.split(foliageNameSuffix)
+                        referenceName = namesplit[0]
+                        self.report({'ERROR'}, "Can't find original foliage object! Remove collection, or use another object named '" + referenceName + "'.")
+
+                        return {'CANCELLED'}
+
+                    foliageColl = bpy.data.collections.get(foliageObject.name)
                 elif c.name.startswith("FoliageEmpty") :
                     foliageColl = bpy.data.collections.get("FoliagePlaceholders")
                 if foliageColl : 
