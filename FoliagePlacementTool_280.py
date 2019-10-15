@@ -15,7 +15,7 @@ import random
 import math
 import mathutils
 from bpy.types import Operator, Panel, PropertyGroup
-from bpy.props import IntProperty, FloatProperty, BoolProperty, PointerProperty,
+from bpy.props import IntProperty, FloatProperty, BoolProperty, PointerProperty
 from mathutils import Matrix, Vector, Euler
 
 # create new base mesh object.
